@@ -1,0 +1,2 @@
+"""Face attendance API package."""
+

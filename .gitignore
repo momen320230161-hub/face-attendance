@@ -1,0 +1,28 @@
+# Secrets & Environment
+.env
+.env*.local
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+
+# IDEs & System
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+.agents/
