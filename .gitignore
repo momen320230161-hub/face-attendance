@@ -1,6 +1,7 @@
 # Secrets & Environment
 .env
 .env*.local
+frontend/.env.local
 
 # Environments
 .venv/
@@ -10,6 +11,8 @@ ENV/
 
 # Python Cache & Bytecode
 __pycache__/
+**/__pycache__/
+*.pyc
 *.py[cod]
 *$py.class
 *.so
@@ -26,3 +29,28 @@ Thumbs.db
 .idea/
 .claude/
 .agents/
+
+# Face Evaluation Data & Reports (Biometric Privacy)
+data/
+eval_output/
+
+# Model caches
+.insightface/
+**/.insightface/
+model_cache/
+**/model_cache/
+**/.cache/
+
+# Logs and temporary files
+*.log
+logs/
+**/logs/
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Build and local tooling artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo

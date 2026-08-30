@@ -87,10 +87,15 @@ Server will run on `http://127.0.0.1:8000`. Access Swagger docs at `http://127.0
 | Method | Endpoint | Auth | Purpose |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/health` | None | API Health Check |
+| `GET` | `/api/v1/auth/me` | Bearer JWT | Retrieve current user profile & role |
+| `GET` | `/api/v1/auth/admin-check` | Admin Bearer JWT | Verify admin role authorization |
 | `POST` | `/enroll` | Staff JWT | Enroll new person with 3–5 face photos |
 | `POST` | `/check-in` | `X-Device-Key` | Kiosk automatic face recognition check-in |
 | `GET` | `/attendance/today` | Staff JWT | Retrieve today's attendance logs |
 | `GET` | `/attendance/today.csv` | Staff JWT | Export today's attendance to CSV |
+
+For full details on Next.js frontend pages (`/login`, `/signup`, `/dashboard`, `/admin`) and manual testing, see [AUTH_GUIDE.md](docs/AUTH_GUIDE.md).
+
 
 ---
 
