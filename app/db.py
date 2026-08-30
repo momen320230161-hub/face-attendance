@@ -8,5 +8,6 @@ from .config import get_settings
 @lru_cache
 def get_supabase() -> Client:
     settings = get_settings()
-    return create_client(settings.supabase_url, settings.supabase_service_key)
+    return create_client(settings.supabase_url, settings.effective_service_role_key)
+
 

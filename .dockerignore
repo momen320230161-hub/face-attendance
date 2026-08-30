@@ -1,0 +1,30 @@
+.env
+.env.*
+.git
+.gitignore
+.venv
+venv
+env
+ENV
+__pycache__
+*.py[cod]
+*.so
+.pytest_cache
+.coverage
+htmlcov
+
+# Local CV/model caches; Docker downloads models explicitly during build.
+.insightface
+**/.insightface
+
+# Frontend and local development artifacts are not part of the backend image.
+frontend
+node_modules
+**/node_modules
+.next
+**/.next
+data
+eval_output
+tests
+scripts
+*.log

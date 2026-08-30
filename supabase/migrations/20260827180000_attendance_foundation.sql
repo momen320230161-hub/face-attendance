@@ -1,17 +1,7 @@
--- Complete Database Schema for Face Recognition Attendance System
+-- Migration: 20260827180000_attendance_foundation.sql
+-- Description: Attendance System Database Foundation (Courses, Enrollments, Sessions, Records, Indexes, and RLS)
 
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- 1. Profiles Table (Auth user roles & profile metadata)
-CREATE TABLE IF NOT EXISTS public.profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    full_name TEXT,
-    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- 2. Courses Table
+-- 1. Courses Table
 CREATE TABLE IF NOT EXISTS public.courses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code TEXT UNIQUE NOT NULL,
@@ -21,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.courses (
     created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL
 );
 
--- 3. Course Enrollments Table
+-- 2. Course Enrollments Table
 CREATE TABLE IF NOT EXISTS public.course_enrollments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
@@ -30,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.course_enrollments (
     CONSTRAINT unique_course_student UNIQUE (course_id, student_id)
 );
 
--- 4. Attendance Sessions Table
+-- 3. Attendance Sessions Table
 CREATE TABLE IF NOT EXISTS public.attendance_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
@@ -41,7 +31,7 @@ CREATE TABLE IF NOT EXISTS public.attendance_sessions (
     created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL
 );
 
--- 5. Attendance Records Table
+-- 4. Attendance Records Table
 CREATE TABLE IF NOT EXISTS public.attendance_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES public.attendance_sessions(id) ON DELETE CASCADE,
@@ -54,29 +44,7 @@ CREATE TABLE IF NOT EXISTS public.attendance_records (
     CONSTRAINT unique_session_student UNIQUE (session_id, student_id)
 );
 
--- Legacy Face Recognition tables
-CREATE TABLE IF NOT EXISTS public.people (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    embedding vector(512) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_by UUID REFERENCES auth.users(id)
-);
-
-CREATE TABLE IF NOT EXISTS public.attendance_log (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    person_id UUID NOT NULL REFERENCES public.people(id) ON DELETE CASCADE,
-    "timestamp" TIMESTAMPTZ NOT NULL DEFAULT now(),
-    confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1)
-);
-
-CREATE TABLE IF NOT EXISTS public.staff (
-    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    role TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('admin', 'staff')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Indexes
+-- 5. Indexes
 CREATE INDEX IF NOT EXISTS idx_course_enrollments_course ON public.course_enrollments(course_id);
 CREATE INDEX IF NOT EXISTS idx_course_enrollments_student ON public.course_enrollments(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_sessions_course ON public.attendance_sessions(course_id);
@@ -84,31 +52,15 @@ CREATE INDEX IF NOT EXISTS idx_attendance_sessions_status ON public.attendance_s
 CREATE INDEX IF NOT EXISTS idx_attendance_records_session ON public.attendance_records(session_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_records_student ON public.attendance_records(student_id);
 
-CREATE INDEX IF NOT EXISTS people_embedding_idx ON public.people USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-CREATE INDEX IF NOT EXISTS attendance_log_timestamp_idx ON public.attendance_log ("timestamp" DESC);
-
--- Functions
-CREATE OR REPLACE FUNCTION match_person(query_embedding vector(512), match_threshold float)
-RETURNS TABLE (id UUID, name TEXT, similarity float)
-LANGUAGE SQL STABLE
-AS $$
-    SELECT p.id, p.name, (1 - (p.embedding <=> query_embedding))::float AS similarity
-    FROM public.people p
-    WHERE 1 - (p.embedding <=> query_embedding) >= match_threshold
-    ORDER BY p.embedding <=> query_embedding
-    LIMIT 1;
-$$;
-
--- Enable RLS
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+-- 6. Enable RLS
 ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.course_enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.people ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.attendance_log ENABLE ROW LEVEL SECURITY;
 
--- Policies for Courses, Enrollments, Sessions, Records
+-- 7. RLS Policies
+
+-- Courses RLS
 DROP POLICY IF EXISTS "Admin full access on courses" ON public.courses;
 CREATE POLICY "Admin full access on courses" ON public.courses
     FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
@@ -117,6 +69,7 @@ DROP POLICY IF EXISTS "Authenticated users view courses" ON public.courses;
 CREATE POLICY "Authenticated users view courses" ON public.courses
     FOR SELECT USING (auth.role() = 'authenticated');
 
+-- Course Enrollments RLS
 DROP POLICY IF EXISTS "Admin full access on course_enrollments" ON public.course_enrollments;
 CREATE POLICY "Admin full access on course_enrollments" ON public.course_enrollments
     FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
@@ -133,6 +86,7 @@ CREATE POLICY "Students view course classmates" ON public.course_enrollments
         AND ce.student_id = auth.uid()
     ));
 
+-- Attendance Sessions RLS
 DROP POLICY IF EXISTS "Admin full access on attendance_sessions" ON public.attendance_sessions;
 CREATE POLICY "Admin full access on attendance_sessions" ON public.attendance_sessions
     FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
@@ -145,6 +99,7 @@ CREATE POLICY "Students view enrolled course sessions" ON public.attendance_sess
         AND ce.student_id = auth.uid()
     ));
 
+-- Attendance Records RLS
 DROP POLICY IF EXISTS "Admin full access on attendance_records" ON public.attendance_records;
 CREATE POLICY "Admin full access on attendance_records" ON public.attendance_records
     FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));

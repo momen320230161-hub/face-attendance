@@ -1,6 +1,6 @@
+import csv
 from datetime import datetime, timezone
 from io import StringIO
-import csv
 from pathlib import Path
 from typing import Annotated
 
@@ -10,20 +10,32 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .attendance import record_check_in
-from .auth import get_current_user, require_device, require_staff
+from .auth import UserProfile, get_current_user, require_admin, require_device, require_staff, require_user
 from .db import get_supabase
 from .face_engine import average_embeddings, decode_image, get_face_embeddings, get_single_embedding
 from .matcher import match_face
+from .routers import admin_router, attendance_router, courses_router, recognition_router, reports_router
 
 app = FastAPI(title="Face Attendance API", version="0.1.0")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[],  # Set explicit dashboard origins before enabling browser access.
+    allow_origins=["*"],  # Enable CORS for local dev / Next.js frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/dashboard", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="dashboard")
+
+app.include_router(courses_router)
+app.include_router(attendance_router)
+app.include_router(recognition_router)
+app.include_router(admin_router)
+app.include_router(reports_router)
+
+
+
+if (Path(__file__).parent / "static").exists():
+    app.mount("/dashboard", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="dashboard")
 
 
 @app.get("/health")
@@ -31,17 +43,48 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+# Phase 3 Auth Verification Endpoints
+@app.get("/api/v1/auth/me")
+def get_me(user: Annotated[UserProfile, Depends(get_current_user)]) -> dict:
+    return {
+        "user_id": user.user_id,
+        "email": user.email,
+        "role": user.role,
+        "full_name": user.full_name,
+    }
+
+
+@app.get("/api/v1/auth/admin-check")
+def admin_check(admin_user: Annotated[UserProfile, Depends(require_admin)]) -> dict:
+    return {
+        "status": "authorized",
+        "user_id": admin_user.user_id,
+        "role": admin_user.role,
+    }
+
+
+@app.get("/api/v1/auth/admin-test", tags=["dev"])
+def admin_test(admin_user: Annotated[UserProfile, Depends(require_admin)]) -> dict:
+    """[DEV] RBAC test endpoint. 401 = no/invalid token. 403 = authenticated but role != admin. 200 = admin."""
+    return {
+        "status": "authorized",
+        "message": "You have admin access.",
+        "user_id": admin_user.user_id,
+        "role": admin_user.role,
+    }
+
+
 @app.post("/enroll", dependencies=[Depends(require_staff)])
 async def enroll_person(
     name: Annotated[str, Form(min_length=1, max_length=150)],
     images: Annotated[list[UploadFile], File()],
-    user_id: Annotated[str, Depends(get_current_user)],
+    user: Annotated[UserProfile, Depends(get_current_user)],
 ) -> dict:
     if not 3 <= len(images) <= 5:
         raise HTTPException(status_code=422, detail="Provide 3 to 5 enrollment images")
     embeddings = [get_single_embedding(decode_image(await image.read())) for image in images]
     result = get_supabase().table("people").insert(
-        {"name": name.strip(), "embedding": average_embeddings(embeddings), "created_by": user_id}
+        {"name": name.strip(), "embedding": average_embeddings(embeddings), "created_by": user.user_id}
     ).execute()
     return {"person": result.data[0], "images_used": len(images)}
 
@@ -89,4 +132,8 @@ def export_today_attendance() -> StreamingResponse:
     for row in _today_rows():
         person = row.get("people") or {}
         writer.writerow([person.get("id"), person.get("name"), row["timestamp"], row["confidence"]])
-    return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=attendance-today.csv"})
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendance-today.csv"},
+    )
