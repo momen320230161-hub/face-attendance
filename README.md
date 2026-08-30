@@ -95,13 +95,29 @@ cd face-recognition-attendance-system
 cp .env.example .env
 ```
 
-Fill in your Supabase credentials in `.env`:
+Open `.env` and fill in the values. All required variables are listed in `.env.example`:
 
 ```env
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your-anon-key
+# Supabase (backend)
+SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-DEVICE_API_KEY=your-kiosk-device-key
+SUPABASE_SERVICE_KEY=your-service-role-key
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_JWT_SECRET=optional-jwt-secret
+
+# Frontend
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_REDIRECT_URL=http://localhost:3000
+
+# Kiosk device secret — sent as the X-Device-Key request header
+DEVICE_API_KEY=replace-with-a-long-random-secret
+
+# Recognition tuning
+MATCH_THRESHOLD=0.60
+DEBOUNCE_MINUTES=20
+INSIGHTFACE_CTX_ID=-1
 ```
 
 ### 3. Apply the Database Schema
